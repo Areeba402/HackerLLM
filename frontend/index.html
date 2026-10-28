@@ -1,0 +1,1027 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HackerLLM — Natural Language Cybersecurity Agent</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.22.20/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Manrope:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-void: #06070a;
+            --bg-base: #0a0b11;
+            --bg-1: #0e0f17;
+            --bg-2: #131420;
+            --bg-3: #181a28;
+            --bg-4: #1f2235;
+            --bg-glass: rgba(20, 21, 35, 0.55);
+
+            --border-faint: rgba(255, 255, 255, 0.04);
+            --border-soft: rgba(255, 255, 255, 0.07);
+            --border-mid: rgba(255, 255, 255, 0.12);
+            --border-brand: rgba(124, 111, 255, 0.30);
+
+            --brand: #7c6fff;
+            --brand-2: #9b8fff;
+            --brand-deep: #5a4fdb;
+            --brand-glow: rgba(124, 111, 255, 0.35);
+            --brand-soft: rgba(124, 111, 255, 0.12);
+            --brand-faint: rgba(124, 111, 255, 0.05);
+
+            --cyan: #22d3ee;
+            --cyan-soft: rgba(34, 211, 238, 0.12);
+            --cyan-glow: rgba(34, 211, 238, 0.35);
+
+            --term-green: #5eff8b;
+            --term-amber: #ffc857;
+
+            --t-1: #f1f1f8;
+            --t-2: #b8b9cc;
+            --t-3: #7d7f93;
+            --t-4: #51536b;
+            --t-5: #353749;
+
+            --sev-critical: #ff4d6d;
+            --sev-high: #ff8c42;
+            --sev-medium: #ffc857;
+            --sev-low: #38e8a4;
+            --sev-info: #8b8da3;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body { background: var(--bg-void); }
+        body {
+            color: var(--t-1);
+            min-height: 100vh;
+            font-family: 'Manrope', system-ui, sans-serif;
+            font-size: 14px;
+            line-height: 1.55;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            overflow: hidden;
+        }
+
+        ::-webkit-scrollbar { width: 7px; height: 7px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--bg-4); border-radius: 8px; transition: background 0.2s; }
+        ::-webkit-scrollbar-thumb:hover { background: var(--brand); }
+        ::selection { background: var(--brand-glow); color: #fff; }
+
+        .mono { font-family: 'JetBrains Mono', monospace; }
+        .display { font-family: 'Sora', sans-serif; letter-spacing: -0.01em; }
+
+        .app-shell {
+            display: flex;
+            height: 100vh;
+            width: 100vw;
+            background:
+                radial-gradient(ellipse 70% 50% at 50% -20%, rgba(124, 111, 255, 0.10), transparent 60%),
+                radial-gradient(ellipse 50% 40% at 90% 80%, rgba(34, 211, 238, 0.05), transparent 60%),
+                var(--bg-void);
+        }
+
+        .grid-bg::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background-image:
+                linear-gradient(rgba(124, 111, 255, 0.035) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(124, 111, 255, 0.035) 1px, transparent 1px);
+            background-size: 56px 56px;
+            mask-image: radial-gradient(ellipse 80% 60% at 50% 35%, black 30%, transparent 80%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .sidebar {
+            width: 290px;
+            flex-shrink: 0;
+            background: linear-gradient(180deg, rgba(13, 14, 22, 0.95), rgba(10, 11, 17, 0.95));
+            border-right: 1px solid var(--border-faint);
+            backdrop-filter: blur(12px);
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            z-index: 10;
+        }
+
+        .brand-block {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 20px 22px;
+            border-bottom: 1px solid var(--border-faint);
+        }
+
+        .brand-mark {
+            width: 36px;
+            height: 36px;
+            border-radius: 10px;
+            background: radial-gradient(circle at 30% 30%, var(--brand), var(--brand-deep));
+            display: grid;
+            place-items: center;
+            box-shadow: 0 0 20px -3px var(--brand-glow);
+            color: #fff;
+            font-size: 16px;
+        }
+
+        .brand-name {
+            font-family: 'Sora', sans-serif;
+            font-weight: 800;
+            font-size: 16px;
+            letter-spacing: -0.01em;
+            color: var(--t-1);
+        }
+        .brand-name .b-purple { color: var(--brand-2); }
+        .brand-sub {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 9px;
+            color: var(--t-4);
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            margin-top: 2px;
+        }
+
+        .sb-cat-label {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.18em;
+            color: var(--t-4);
+            margin: 0 0 10px 4px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .sb-cat-label::before {
+            content: '';
+            width: 16px;
+            height: 1px;
+            background: var(--brand);
+            opacity: 0.5;
+        }
+
+        .tool-card {
+            background: linear-gradient(180deg, rgba(20, 21, 35, 0.4), rgba(14, 15, 23, 0.5));
+            border: 1px solid var(--border-faint);
+            border-radius: 9px;
+            padding: 10px 12px;
+            cursor: pointer;
+            transition: all 0.18s cubic-bezier(0.2, 0.7, 0.2, 1);
+        }
+        .tool-card:hover {
+            border-color: var(--border-brand);
+            background: linear-gradient(180deg, rgba(124, 111, 255, 0.08), rgba(14, 15, 23, 0.6));
+            transform: translateX(2px);
+        }
+        .tool-card.disabled { opacity: 0.4; cursor: not-allowed; }
+        .tool-card.disabled:hover { transform: none; border-color: var(--border-faint); }
+        
+        .tool-card-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            margin-bottom: 4px;
+        }
+        .tool-card-name { font-size: 12px; font-weight: 600; color: var(--t-2); }
+        .tool-card:hover .tool-card-name { color: var(--t-1); }
+        .tool-card-icon {
+            width: 22px;
+            height: 22px;
+            border-radius: 6px;
+            background: var(--bg-3);
+            display: grid;
+            place-items: center;
+            color: var(--t-3);
+            font-size: 10px;
+        }
+        .tool-card:hover .tool-card-icon { background: var(--brand-soft); color: var(--brand-2); }
+        .tool-card-cmd {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 9.5px;
+            color: var(--t-4);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .sb-footer {
+            padding: 14px 18px 18px;
+            border-top: 1px solid var(--border-faint);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .status-pill {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 7px 11px;
+            background: rgba(20, 21, 35, 0.5);
+            border: 1px solid var(--border-soft);
+            border-radius: 999px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .status-pill:hover { border-color: var(--border-mid); background: rgba(20, 21, 35, 0.7); }
+        .status-pill-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: var(--t-2);
+        }
+        .status-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            box-shadow: 0 0 8px currentColor;
+        }
+        .status-dot.online { background: var(--term-green); color: var(--term-green); }
+        .status-dot.offline { background: var(--sev-critical); color: var(--sev-critical); }
+        .status-dot.connecting { background: var(--term-amber); color: var(--term-amber); animation: pulseDot 1s infinite; }
+
+        @keyframes pulseDot { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(0.85); } }
+
+        .ghost-btn {
+            width: 100%;
+            padding: 9px 14px;
+            background: transparent;
+            border: 1px solid var(--border-soft);
+            border-radius: 8px;
+            color: var(--t-3);
+            font-size: 11.5px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.18s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        .ghost-btn:hover { border-color: var(--border-mid); color: var(--t-1); background: rgba(255, 255, 255, 0.02); }
+
+        .main-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            height: 100vh;
+            overflow: hidden;
+            background: var(--bg-base);
+        }
+
+        .topbar {
+            height: 60px;
+            border-bottom: 1px solid var(--border-faint);
+            display: flex;
+            align-items: center;
+            padding: 0 20px;
+            gap: 14px;
+            background: rgba(10, 11, 17, 0.7);
+            backdrop-filter: blur(10px);
+            z-index: 5;
+        }
+
+        .new-mission-btn {
+            padding: 8px 14px;
+            background: linear-gradient(135deg, var(--brand), var(--brand-deep));
+            border: none;
+            border-radius: 8px;
+            color: #fff;
+            font-family: 'Sora', sans-serif;
+            font-weight: 600;
+            font-size: 12px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            box-shadow: 0 4px 14px -3px var(--brand-glow);
+            transition: all 0.18s;
+        }
+        .new-mission-btn:hover { filter: brightness(1.1); transform: translateY(-1px); }
+
+        .tabs-row {
+            display: flex;
+            gap: 8px;
+            overflow-x: auto;
+            flex: 1;
+        }
+        .tab {
+            padding: 6px 14px;
+            background: rgba(20, 21, 35, 0.5);
+            border: 1px solid var(--border-faint);
+            border-radius: 8px;
+            color: var(--t-3);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            white-space: nowrap;
+            transition: all 0.18s;
+        }
+        .tab:hover { color: var(--t-1); border-color: var(--border-soft); }
+        .tab.active {
+            background: var(--brand-soft);
+            border-color: var(--brand);
+            color: var(--t-1);
+        }
+
+        .chat-scroll {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px 28px 140px;
+            display: flex;
+            flex-direction: column;
+        }
+        .chat-inner { max-width: 860px; width: 100%; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+
+        .msg-user {
+            align-self: flex-end;
+            max-width: 75%;
+            background: linear-gradient(135deg, var(--brand), var(--brand-deep));
+            color: #fff;
+            padding: 12px 18px;
+            border-radius: 14px 14px 2px 14px;
+            font-size: 13.5px;
+            line-height: 1.5;
+            box-shadow: 0 8px 24px -8px var(--brand-glow);
+        }
+
+        .msg-asst {
+            align-self: flex-start;
+            max-width: 88%;
+            display: flex;
+            gap: 14px;
+        }
+        .msg-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            background: var(--bg-3);
+            border: 1px solid var(--border-soft);
+            display: grid;
+            place-items: center;
+            color: var(--brand-2);
+            font-size: 13px;
+            flex-shrink: 0;
+            margin-top: 4px;
+        }
+        .msg-asst-body {
+            flex: 1;
+            background: rgba(20, 21, 35, 0.6);
+            border: 1px solid var(--border-soft);
+            border-radius: 14px 14px 14px 2px;
+            padding: 16px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .msg-asst-tag {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 10px;
+            color: var(--brand-2);
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .tool-call {
+            background: rgba(14, 15, 23, 0.9);
+            border: 1px solid var(--border-brand);
+            border-radius: 10px;
+            overflow: hidden;
+            margin-top: 6px;
+        }
+        .tool-call-head {
+            background: rgba(124, 111, 255, 0.08);
+            padding: 9px 14px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid var(--border-faint);
+            font-size: 11.5px;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .tool-call-body { padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+        .tool-cmd {
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid var(--border-faint);
+            border-radius: 6px;
+            padding: 8px 12px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12px;
+            color: var(--cyan);
+            word-break: break-all;
+        }
+        .exec-btn {
+            align-self: flex-start;
+            padding: 8px 16px;
+            background: linear-gradient(135deg, #10b981, #059669);
+            border: none;
+            border-radius: 7px;
+            color: #fff;
+            font-family: 'Sora', sans-serif;
+            font-size: 11.5px;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            transition: all 0.15s;
+        }
+        .exec-btn:hover { filter: brightness(1.1); transform: translateY(-1px); }
+
+        .telemetry-pre {
+            background: #000;
+            border: 1px solid var(--border-soft);
+            border-radius: 8px;
+            padding: 12px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 11px;
+            color: #d1d5db;
+            max-height: 250px;
+            overflow: auto;
+            white-space: pre-wrap;
+        }
+
+        .composer-wrap {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 24px 28px 20px;
+            background: linear-gradient(to top, var(--bg-void) 30%, transparent);
+            z-index: 5;
+            pointer-events: none;
+        }
+        .composer-inner { max-width: 860px; margin: 0 auto; pointer-events: auto; }
+        .composer {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px 8px 8px 20px;
+            background: rgba(20, 21, 35, 0.9);
+            border: 1px solid var(--border-mid);
+            border-radius: 16px;
+            backdrop-filter: blur(14px);
+            box-shadow: 0 18px 45px -10px rgba(0, 0, 0, 0.7);
+        }
+        .composer:focus-within { border-color: var(--brand); box-shadow: 0 0 0 3px var(--brand-soft); }
+        .composer input {
+            flex: 1;
+            background: transparent;
+            border: none;
+            outline: none;
+            color: var(--t-1);
+            font-size: 14px;
+        }
+        .send-btn {
+            width: 38px;
+            height: 38px;
+            border-radius: 10px;
+            background: linear-gradient(135deg, var(--brand), var(--brand-deep));
+            color: #fff;
+            border: none;
+            cursor: pointer;
+            display: grid;
+            place-items: center;
+            transition: all 0.15s;
+        }
+        .send-btn:hover { transform: scale(1.05); }
+        .send-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 60px 20px;
+            text-align: center;
+        }
+        .empty-icon {
+            width: 60px;
+            height: 60px;
+            border-radius: 16px;
+            background: radial-gradient(circle at 30% 30%, var(--brand-soft), rgba(14, 15, 23, 0.4));
+            border: 1px solid var(--border-brand);
+            display: grid;
+            place-items: center;
+            color: var(--brand-2);
+            font-size: 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 0 30px var(--brand-glow);
+        }
+        .empty-title { font-family: 'Sora', sans-serif; font-size: 26px; font-weight: 700; color: #fff; margin-bottom: 8px; }
+        .empty-title .accent { background: linear-gradient(135deg, var(--brand-2), var(--cyan)); -webkit-background-clip: text; color: transparent; }
+        .empty-sub { font-size: 13.5px; color: var(--t-3); max-width: 520px; margin-bottom: 28px; line-height: 1.6; }
+
+        .suggestion-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+            max-width: 640px;
+            width: 100%;
+        }
+        .suggestion {
+            text-align: left;
+            background: rgba(20, 21, 35, 0.5);
+            border: 1px solid var(--border-soft);
+            border-radius: 10px;
+            padding: 14px 16px;
+            cursor: pointer;
+            transition: all 0.18s;
+        }
+        .suggestion:hover { border-color: var(--border-brand); transform: translateY(-2px); background: rgba(124, 111, 255, 0.08); }
+        .suggestion-title { font-family: 'Sora', sans-serif; font-weight: 600; font-size: 13px; color: var(--t-1); }
+        .suggestion-sub { font-size: 11.5px; color: var(--t-3); margin-top: 4px; }
+
+        .modal-backdrop {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(8px);
+            display: grid;
+            place-items: center;
+            z-index: 100;
+        }
+        .modal {
+            width: 100%;
+            max-width: 460px;
+            background: #0e0f17;
+            border: 1px solid var(--border-mid);
+            border-radius: 14px;
+            padding: 22px;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.8);
+        }
+        .modal-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; }
+        .modal-head h3 { font-family: 'Sora', sans-serif; font-weight: 700; font-size: 16px; color: #fff; }
+        .field { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+        .field label { font-family: 'JetBrains Mono', monospace; font-size: 10.5px; color: var(--t-3); text-transform: uppercase; }
+        .field input {
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid var(--border-soft);
+            border-radius: 8px;
+            padding: 10px 12px;
+            color: #fff;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 12.5px;
+            outline: none;
+        }
+        .field input:focus { border-color: var(--brand); }
+        .modal-cta {
+            width: 100%;
+            padding: 11px;
+            background: linear-gradient(135deg, var(--brand), var(--brand-deep));
+            border: none;
+            border-radius: 8px;
+            color: #fff;
+            font-family: 'Sora', sans-serif;
+            font-weight: 700;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        .markdown-body { font-size: 13.5px; line-height: 1.6; color: var(--t-1); }
+        .markdown-body p { margin-bottom: 8px; }
+        .markdown-body pre { background: #000; padding: 10px; border-radius: 6px; overflow-x: auto; margin: 8px 0; }
+        .markdown-body code { font-family: 'JetBrains Mono', monospace; color: var(--cyan); }
+    </style>
+</head>
+
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        const AppUtils = {
+            generateId: () => Math.random().toString(36).substr(2, 9),
+            getStorage: (k, d) => { try { return JSON.parse(localStorage.getItem(k)) || d; } catch { return d; } },
+            setStorage: (k, v) => localStorage.setItem(k, JSON.stringify(v)),
+            parseChatPayload: (str) => {
+                const start = "///TOOL_START///"; const end = "///TOOL_END///";
+                const si = str.indexOf(start); const ei = str.indexOf(end);
+                if (si === -1 || ei === -1) return null;
+                try { return JSON.parse(str.substring(si + start.length, ei)); } catch (e) { return null; }
+            },
+            scrubContent: (content) => {
+                if (!content) return "";
+                return content.split("///TOOL_START///")[0].trim();
+            },
+            renderMd: (text) => {
+                try { return marked.parse(text); }
+                catch (e) { return text; }
+            }
+        };
+
+        const SYSTEM_INSTRUCTIONS = (target) => `You are 'HackerLLM', an open-source cybersecurity agent that turns natural language into real security tool execution.
+Target: ${target}.
+Your job is to strategically guide the operator, select the appropriate tools, and prepare exact CLI commands (nmap, nuclei, sqlmap, gobuster, nikto, hydra, etc.) needed to audit this target.
+When you propose executing a tool, you MUST include a clean JSON block enclosed inside ///TOOL_START/// and ///TOOL_END/// markers so the operator can trigger execution with a single click.
+
+Example format:
+///TOOL_START///
+{"tool": "nmap", "options": "-sV -sC ${target}"}
+///TOOL_END///
+
+Always provide clean options tailored to the engagement.`;
+
+        const ARSENAL = {
+            "Reconnaissance": [
+                { id: "nmap", name: "Nmap Port Scan", cmd: "nmap -sV -sC TARGET", icon: "fa-bolt" },
+                { id: "masscan", name: "Masscan Fast", cmd: "masscan TARGET -p1-10000 --rate=1000", icon: "fa-gauge-high" },
+                { id: "nikto", name: "Nikto Web Scan", cmd: "nikto -h TARGET", icon: "fa-shield-virus" }
+            ],
+            "Web & Vuln Discovery": [
+                { id: "nuclei", name: "Nuclei CVE Scan", cmd: "nuclei -u TARGET", icon: "fa-crosshairs" },
+                { id: "gobuster", name: "Gobuster Dir", cmd: "gobuster dir -u TARGET -w /usr/share/wordlists/dirb/common.txt", icon: "fa-folder-tree" },
+                { id: "sqlmap", name: "SQLMap Injection", cmd: "sqlmap -u TARGET --batch", icon: "fa-database" }
+            ],
+            "Credentials & Auditing": [
+                { id: "hydra", name: "Hydra SSH/FTP", cmd: "hydra -L users.txt -P pass.txt ssh://TARGET", icon: "fa-key" },
+                { id: "enum4linux", name: "Enum4Linux SMB", cmd: "enum4linux -a TARGET", icon: "fa-network-wired" }
+            ]
+        };
+
+        const SUGGESTIONS = [
+            { icon: "fa-radar", title: "Map Open Ports", sub: "Perform initial reconnaissance to discover listening services.", prompt: "Run an initial port and service enumeration scan against the target." },
+            { icon: "fa-bug", title: "Scan for Known CVEs", sub: "Analyze the target services for known high-severity vulnerabilities.", prompt: "Audit the target services for known CVEs and misconfigurations using Nuclei or Nmap scripts." },
+            { icon: "fa-folder-tree", title: "Enumerate Web Directories", sub: "Fuzz web paths and hidden endpoints.", prompt: "Enumerate directories, login portals, and hidden endpoints on the web target." },
+            { icon: "fa-database", title: "Test for SQL Injection", sub: "Detect database vulnerabilities in web parameters.", prompt: "Examine web parameters for SQL injection flaws." }
+        ];
+
+        const App = () => {
+            const [sessions, setSessions] = useState(() => AppUtils.getStorage('hackerllm_sessions', []));
+            const [activeSessionId, setActiveSessionId] = useState(null);
+            const [status, setStatus] = useState('connecting');
+            const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+            const [config, setConfig] = useState(() => {
+                const stored = AppUtils.getStorage('hackerllm_config', null);
+                if (stored) return stored;
+                const defaultApi = (window.location.origin && window.location.origin !== 'null' && window.location.protocol !== 'file:')
+                    ? window.location.origin
+                    : 'http://localhost:5000';
+                return { baseUrl: defaultApi, model: '' };
+            });
+            const [isThinking, setIsThinking] = useState(false);
+
+            const activeSession = sessions.find(s => s.id === activeSessionId);
+            const chatEndRef = useRef(null);
+            const inputRef = useRef(null);
+
+            useEffect(() => {
+                const checkStatus = async () => {
+                    try {
+                        const controller = new AbortController();
+                        const id = setTimeout(() => controller.abort(), 2000);
+                        const res = await fetch(`${config.baseUrl}/ping`, { signal: controller.signal });
+                        clearTimeout(id);
+                        if (res.ok) setStatus('online'); else setStatus('offline');
+                    } catch { setStatus('offline'); }
+                };
+                checkStatus();
+                const interval = setInterval(checkStatus, 6000);
+                return () => clearInterval(interval);
+            }, [config.baseUrl]);
+
+            useEffect(() => AppUtils.setStorage('hackerllm_config', config), [config]);
+            useEffect(() => AppUtils.setStorage('hackerllm_sessions', sessions), [sessions]);
+            useEffect(() => chatEndRef.current?.scrollIntoView({ behavior: "smooth" }), [activeSession?.messages, isThinking]);
+
+            const handleSendMessage = async (text) => {
+                if (!activeSession || !text.trim()) return;
+                const newMsgs = [...(activeSession.messages || []), { role: 'user', content: text }];
+                setSessions(prev => prev.map(s => s.id === activeSessionId ? { ...s, messages: newMsgs } : s));
+                setIsThinking(true);
+
+                try {
+                    const res = await fetch(`${config.baseUrl}/v1/chat/completions`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            model: config.model || undefined,
+                            messages: [{ role: "system", content: SYSTEM_INSTRUCTIONS(activeSession.target) }, ...newMsgs],
+                            temperature: 0.2
+                        })
+                    });
+
+                    if (!res.ok) {
+                        const err = await res.json().catch(() => ({ detail: "Request failed" }));
+                        throw new Error(err.detail || `HTTP ${res.status}`);
+                    }
+
+                    const data = await res.json();
+                    if (data.choices && data.choices[0]) {
+                        const response = data.choices[0].message.content;
+                        const tool = AppUtils.parseChatPayload(response);
+
+                        setSessions(prev => prev.map(s => s.id === activeSessionId ? {
+                            ...s,
+                            messages: [...newMsgs, {
+                                role: 'assistant',
+                                content: response,
+                                toolCall: tool ? { ...tool, target: s.target } : null
+                            }]
+                        } : s));
+                    }
+                } catch (e) {
+                    setSessions(prev => prev.map(s => s.id === activeSessionId ? {
+                        ...s,
+                        messages: [...newMsgs, {
+                            role: 'assistant',
+                            content: `⚠️ **EXECUTION ERROR**: ${e.message}\n\nPlease check your LLM provider key or .env configuration.`,
+                            isError: true
+                        }]
+                    } : s));
+                } finally {
+                    setIsThinking(false);
+                }
+            };
+
+            const handleRunTool = async (msgIndex, toolData) => {
+                setSessions(prev => {
+                    const next = [...prev];
+                    const sIdx = next.findIndex(s => s.id === activeSessionId);
+                    next[sIdx].messages[msgIndex].executionStatus = 'running';
+                    return next;
+                });
+
+                try {
+                    const res = await fetch(`${config.baseUrl}/run/${toolData.tool}`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ target: toolData.target, options: toolData.options, jobId: activeSessionId })
+                    });
+                    const result = await res.json();
+                    const output = result.output || result.error || "Operation completed with no output.";
+
+                    setSessions(prev => {
+                        const next = [...prev];
+                        const sIdx = next.findIndex(s => s.id === activeSessionId);
+                        next[sIdx].messages[msgIndex].executionStatus = 'complete';
+                        next[sIdx].messages[msgIndex].rawOutput = output;
+                        return next;
+                    });
+
+                    // Feed output back to HackerLLM for automated telemetry synthesis
+                    handleSendMessage(`The tool '${toolData.tool}' finished execution with code ${result.rc}. Output:\n\n\`\`\`\n${output.slice(0, 4000)}\n\`\`\`\n\nPlease analyze and summarize these findings concisely.`);
+                } catch (e) {
+                    setSessions(prev => {
+                        const next = [...prev];
+                        const sIdx = next.findIndex(s => s.id === activeSessionId);
+                        next[sIdx].messages[msgIndex].executionStatus = 'error';
+                        return next;
+                    });
+                }
+            };
+
+            const startNewMission = () => {
+                const target = prompt("Enter Target Domain or IP (e.g. 10.10.11.20 or example.com):");
+                if (target && target.trim()) {
+                    const t = target.trim();
+                    const id = AppUtils.generateId();
+                    setSessions([{ id, name: `Target: ${t}`, target: t, messages: [] }, ...sessions]);
+                    setActiveSessionId(id);
+                }
+            };
+
+            return (
+                <div className="app-shell">
+                    {/* SIDEBAR */}
+                    <aside className="sidebar">
+                        <div className="brand-block">
+                            <div className="brand-mark">
+                                <i className="fa-solid fa-terminal"></i>
+                            </div>
+                            <div>
+                                <div className="brand-name">Hacker<span className="b-purple">LLM</span></div>
+                                <div className="brand-sub">Natural Language Cyber Agent</div>
+                            </div>
+                        </div>
+
+                        <div style={{ flex: 1, overflowY: 'auto', padding: '18px 16px' }}>
+                            {Object.entries(ARSENAL).map(([cat, tools]) => (
+                                <div key={cat} style={{ marginBottom: 20 }}>
+                                    <div className="sb-cat-label">{cat}</div>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                        {tools.map(tool => (
+                                            <div
+                                                key={tool.id}
+                                                onClick={() => activeSession && handleSendMessage(`Operator Request: Prepare execution of ${tool.name}`)}
+                                                className={`tool-card ${!activeSession ? 'disabled' : ''}`}
+                                            >
+                                                <div className="tool-card-head">
+                                                    <span className="tool-card-name">{tool.name}</span>
+                                                    <span className="tool-card-icon"><i className={`fa-solid ${tool.icon}`}></i></span>
+                                                </div>
+                                                <div className="tool-card-cmd">{tool.cmd}</div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        <div className="sb-footer">
+                            <div className="status-pill" onClick={() => setIsSettingsOpen(true)}>
+                                <div className="status-pill-left">
+                                    <span className={`status-dot ${status}`}></span>
+                                    <span>{status}</span>
+                                </div>
+                                <i className="fa-solid fa-sliders" style={{ color: 'var(--t-3)', fontSize: 11 }}></i>
+                            </div>
+                            <button onClick={() => { if (confirm("Clear all active missions?")) { setSessions([]); setActiveSessionId(null); } }} className="ghost-btn">
+                                <i className="fa-solid fa-trash-can"></i> Clear Sessions
+                            </button>
+                        </div>
+                    </aside>
+
+                    {/* MAIN AREA */}
+                    <main className="main-area grid-bg">
+                        <div className="topbar">
+                            <button className="new-mission-btn" onClick={startNewMission}>
+                                <i className="fa-solid fa-plus"></i> New Mission
+                            </button>
+
+                            <div className="tabs-row">
+                                {sessions.map(s => (
+                                    <button
+                                        key={s.id}
+                                        onClick={() => setActiveSessionId(s.id)}
+                                        className={`tab ${s.id === activeSessionId ? 'active' : ''}`}
+                                    >
+                                        <i className="fa-solid fa-crosshairs" style={{ fontSize: 10 }}></i>
+                                        <span>{s.name}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {!activeSession ? (
+                            <div className="empty-state">
+                                <div className="empty-icon"><i className="fa-solid fa-shield-halved"></i></div>
+                                <h1 className="empty-title">Welcome to <span className="accent">HackerLLM</span></h1>
+                                <p className="empty-sub">
+                                    An open-source AI agent that lets you run cybersecurity tools using natural language. Start a new mission, point to a target, and chat to execute real Kali tools.
+                                </p>
+
+                                <div className="suggestion-grid">
+                                    {SUGGESTIONS.map((s, i) => (
+                                        <div key={i} className="suggestion" onClick={startNewMission}>
+                                            <div className="suggestion-title">{s.title}</div>
+                                            <div className="suggestion-sub">{s.sub}</div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="chat-scroll">
+                                <div className="chat-inner">
+                                    {activeSession.messages.map((m, i) => (
+                                        <div key={i} className={m.role === 'user' ? 'msg-user' : 'msg-asst'}>
+                                            {m.role === 'assistant' && (
+                                                <div className="msg-avatar"><i className="fa-solid fa-robot"></i></div>
+                                            )}
+                                            <div className={m.role === 'assistant' ? 'msg-asst-body' : ''}>
+                                                {m.role === 'assistant' && (
+                                                    <div className="msg-asst-tag">
+                                                        <i className="fa-solid fa-shield"></i> HackerLLM Agent
+                                                    </div>
+                                                )}
+                                                <div
+                                                    className="markdown-body"
+                                                    dangerouslySetInnerHTML={{ __html: AppUtils.renderMd(AppUtils.scrubContent(m.content)) }}
+                                                ></div>
+
+                                                {m.toolCall && (
+                                                    <div className="tool-call">
+                                                        <div className="tool-call-head">
+                                                            <span><i className="fa-solid fa-bolt"></i> Ready: {m.toolCall.tool}</span>
+                                                            <span style={{ color: 'var(--brand-2)' }}>{m.executionStatus || 'Standby'}</span>
+                                                        </div>
+                                                        <div className="tool-call-body">
+                                                            <code className="tool-cmd">{m.toolCall.tool} {m.toolCall.options}</code>
+                                                            {!m.executionStatus && (
+                                                                <button onClick={() => handleRunTool(i, m.toolCall)} className="exec-btn">
+                                                                    <i className="fa-solid fa-play"></i> Execute Tool
+                                                                </button>
+                                                            )}
+                                                            {m.rawOutput && (
+                                                                <details style={{ marginTop: 6 }}>
+                                                                    <summary style={{ cursor: 'pointer', fontSize: 11, color: 'var(--t-3)' }}>
+                                                                        View Raw Telemetry Output
+                                                                    </summary>
+                                                                    <pre className="telemetry-pre">{m.rawOutput}</pre>
+                                                                </details>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {isThinking && (
+                                        <div className="msg-asst">
+                                            <div className="msg-avatar"><i className="fa-solid fa-brain"></i></div>
+                                            <div className="msg-asst-body" style={{ color: 'var(--t-3)', fontStyle: 'italic' }}>
+                                                Analyzing objective & preparing tool commands...
+                                            </div>
+                                        </div>
+                                    )}
+                                    <div ref={chatEndRef}></div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* COMPOSER */}
+                        <div className="composer-wrap">
+                            <div className="composer-inner">
+                                <form
+                                    onSubmit={e => {
+                                        e.preventDefault();
+                                        const v = e.target.input.value;
+                                        if (v.trim()) {
+                                            handleSendMessage(v);
+                                            e.target.input.value = '';
+                                        }
+                                    }}
+                                >
+                                    <div className="composer">
+                                        <input
+                                            name="input"
+                                            placeholder={activeSession ? `Tell HackerLLM what to audit on ${activeSession.target}...` : "Start a mission to begin..."}
+                                            disabled={!activeSession}
+                                            autoComplete="off"
+                                        />
+                                        <button type="submit" className="send-btn" disabled={!activeSession}>
+                                            <i className="fa-solid fa-arrow-up"></i>
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </main>
+
+                    {/* SETTINGS MODAL */}
+                    {isSettingsOpen && (
+                        <div className="modal-backdrop" onClick={e => { if (e.target === e.currentTarget) setIsSettingsOpen(false); }}>
+                            <div className="modal">
+                                <div className="modal-head">
+                                    <h3>System Configuration</h3>
+                                    <button onClick={() => setIsSettingsOpen(false)} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer' }}>
+                                        <i className="fa-solid fa-xmark"></i>
+                                    </button>
+                                </div>
+                                <div className="field">
+                                    <label>API Gateway Base URL</label>
+                                    <input
+                                        type="text"
+                                        value={config.baseUrl}
+                                        onChange={e => setConfig({ ...config, baseUrl: e.target.value })}
+                                        placeholder="http://localhost:5000"
+                                    />
+                                </div>
+                                <div className="field">
+                                    <label>Model Override (Optional)</label>
+                                    <input
+                                        type="text"
+                                        value={config.model}
+                                        onChange={e => setConfig({ ...config, model: e.target.value })}
+                                        placeholder="e.g. gemini-2.0-flash, llama3.1, gpt-4o"
+                                    />
+                                </div>
+                                <button className="modal-cta" onClick={() => setIsSettingsOpen(false)}>
+                                    Save Configuration
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            );
+        };
+
+        ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+</body>
+</html>
