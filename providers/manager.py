@@ -191,10 +191,10 @@ class LLMManager:
                     "Content-Type": "application/json"
                 }
                 return await self._http_post(endpoint, headers, payload, "Vertex AI (ADC)")
-            except ImportError:
+            except ImportError as ie:
                 raise RuntimeError(
-                    "Missing 'google-auth' package required for Vertex AI ADC. "
-                    "Please install it using: pip install google-auth"
+                    f"Missing dependency for Vertex AI ADC: {str(ie)}. "
+                    "Please install using: pip install google-auth requests"
                 )
             except Exception as e:
                 print(f"[!] [VERTEX ADC ERROR] {e}", file=sys.stderr)
