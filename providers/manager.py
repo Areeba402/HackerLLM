@@ -9,7 +9,7 @@ class LLMManager:
     """
     Unified manager routing chat requests to supported LLM platforms:
     - Ollama (Local & 100% Free)
-    - Google Gemini (Free tier available)
+    - Google Gemini (Google AI Studio & Vertex AI with GCP billing/ADC)
     - Groq (Free tier available, ultra-fast)
     - OpenAI / OpenAI-Compatible (DeepSeek, OpenRouter, Together AI, vLLM, LM Studio)
     """
@@ -31,7 +31,15 @@ class LLMManager:
             return ("Groq", os.getenv("GROQ_MODEL", "llama-3.3-70b-versatile"))
 
         gemini_key = os.getenv("GEMINI_API_KEY", "").strip()
-        if gemini_key:
+        is_vertex = (
+            gemini_key == "vertex_adc_dummy_key"
+            or bool(os.getenv("GCP_PROJECT_ID"))
+            or bool(os.getenv("GOOGLE_APPLICATION_CREDENTIALS"))
+            or os.path.exists("adc.json")
+        )
+        if is_vertex and gemini_key == "vertex_adc_dummy_key":
+            return ("Vertex AI (ADC)", os.getenv("GEMINI_MODEL", "gemini-2.5-flash"))
+        elif gemini_key:
             return ("Gemini", os.getenv("GEMINI_MODEL", "gemini-2.0-flash"))
 
         openai_key = client_key or os.getenv("OPENAI_API_KEY", "").strip()
@@ -62,9 +70,15 @@ class LLMManager:
         if groq_key:
             return await self._call_groq(messages, model, temperature, groq_key)
 
-        # 3. Check Google Gemini (Free tier via Google AI Studio)
+        # 3. Check Google Gemini (AI Studio or Vertex AI via GCP ADC credits)
         gemini_key = os.getenv("GEMINI_API_KEY", "").strip()
-        if gemini_key:
+        is_vertex = (
+            gemini_key == "vertex_adc_dummy_key"
+            or bool(os.getenv("GCP_PROJECT_ID"))
+            or bool(os.getenv("GOOGLE_APPLICATION_CREDENTIALS"))
+            or os.path.exists("adc.json")
+        )
+        if gemini_key or is_vertex:
             return await self._call_gemini(messages, model, temperature, gemini_key)
 
         # 4. Check OpenAI or custom OpenAI-compatible endpoint
@@ -78,8 +92,9 @@ class LLMManager:
 
         raise ValueError(
             "No LLM provider configured! Please set one of the following in your .env file:\n"
-            "  - OLLAMA_URL (e.g. http://localhost:11434 for local free LLMs)\n"
+            "  - Vertex AI (GCP credits): set GEMINI_API_KEY=vertex_adc_dummy_key and place adc.json in project root\n"
             "  - GEMINI_API_KEY (Free at https://aistudio.google.com)\n"
+            "  - OLLAMA_URL (e.g. http://localhost:11434 for local free LLMs)\n"
             "  - GROQ_API_KEY (Free at https://console.groq.com)\n"
             "  - OPENAI_API_KEY (from OpenAI, DeepSeek, or any compatible provider)"
         )
@@ -116,7 +131,76 @@ class LLMManager:
     async def _call_gemini(
         self, messages: List[Dict[str, Any]], model: Optional[str], temperature: float, key: str
     ) -> Dict[str, Any]:
-        target_model = model or os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
+        target_model = model or os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+
+        # Sanitize model name (e.g. gemini-3.1-pro doesn't exist, fall back to gemini-2.5-pro or 2.5-flash)
+        if "3.1" in target_model or "preview" in target_model:
+            target_model = "gemini-2.5-pro" if "pro" in target_model else "gemini-2.5-flash"
+
+        # Check if using Vertex AI with ADC (GCP billing credits)
+        is_vertex = (
+            key == "vertex_adc_dummy_key"
+            or bool(os.getenv("GCP_PROJECT_ID"))
+            or bool(os.getenv("GOOGLE_APPLICATION_CREDENTIALS"))
+            or os.path.exists("adc.json")
+        )
+
+        if is_vertex and (key == "vertex_adc_dummy_key" or not key):
+            try:
+                import google.auth
+                from google.auth.transport.requests import Request as GoogleAuthRequest
+
+                # Auto-detect local adc.json if GOOGLE_APPLICATION_CREDENTIALS is not explicitly set
+                if not os.getenv("GOOGLE_APPLICATION_CREDENTIALS") and os.path.exists("adc.json"):
+                    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.path.abspath("adc.json")
+
+                credentials, default_project_id = google.auth.default()
+                credentials.refresh(GoogleAuthRequest())
+
+                # Resolve project ID
+                project_id = os.getenv("GCP_PROJECT_ID", default_project_id)
+                if not project_id and os.path.exists("adc.json"):
+                    try:
+                        with open("adc.json", "r") as f:
+                            adc_data = json.load(f)
+                            project_id = adc_data.get("project_id") or adc_data.get("quota_project_id")
+                    except Exception:
+                        pass
+
+                if not project_id:
+                    raise ValueError("Could not determine GCP_PROJECT_ID. Please set GCP_PROJECT_ID in your .env")
+
+                location = os.getenv("GCP_LOCATION", "us-central1")
+                vertex_model = target_model if target_model.startswith("google/") else f"google/{target_model}"
+
+                endpoint = f"https://{location}-aiplatform.googleapis.com/v1beta1/projects/{project_id}/locations/{location}/endpoints/openapi/chat/completions"
+                payload = {
+                    "model": vertex_model,
+                    "messages": messages,
+                    "temperature": temperature,
+                    "safety_settings": [
+                        {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+                        {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+                        {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+                        {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
+                        {"category": "HARM_CATEGORY_CIVIC_INTEGRITY", "threshold": "BLOCK_NONE"},
+                    ]
+                }
+                headers = {
+                    "Authorization": f"Bearer {credentials.token}",
+                    "Content-Type": "application/json"
+                }
+                return await self._http_post(endpoint, headers, payload, "Vertex AI (ADC)")
+            except ImportError:
+                raise RuntimeError(
+                    "Missing 'google-auth' package required for Vertex AI ADC. "
+                    "Please install it using: pip install google-auth"
+                )
+            except Exception as e:
+                print(f"[!] [VERTEX ADC ERROR] {e}", file=sys.stderr)
+                raise RuntimeError(f"Vertex AI ADC authentication failed: {str(e)}")
+
+        # Default: Google AI Studio endpoint (expects API key starting with AIzaSy...)
         endpoint = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
         payload = {
             "model": target_model,
@@ -127,7 +211,7 @@ class LLMManager:
             "Authorization": f"Bearer {key}",
             "Content-Type": "application/json"
         }
-        return await self._http_post(endpoint, headers, payload, "Gemini")
+        return await self._http_post(endpoint, headers, payload, "Gemini (AI Studio)")
 
     async def _call_openai_compatible(
         self,
